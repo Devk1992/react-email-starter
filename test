@@ -1,0 +1,52 @@
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
+from awsglue.context import GlueContext
+from awsglue.job import Job
+
+# Start the Spark context
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+job = Job(glueContext)
+
+# Define the PostgreSQL connection parameters
+postgre_host = "YOUR_POSTGRESQL_HOST"
+postgre_port = "YOUR_POSTGRESQL_PORT"
+postgre_database = "YOUR_POSTGRESQL_DATABASE"
+postgre_username = "YOUR_POSTGRESQL_USERNAME"
+postgre_password = "YOUR_POSTGRESQL_PASSWORD"
+
+# Define the Glue job parameters
+args = getResolvedOptions(sys.argv, ['JOB_NAME'])
+job.init(args['JOB_NAME'], args)
+
+# Connect to the PostgreSQL database using JDBC
+jdbc_url = f"jdbc:postgresql://{postgre_host}:{postgre_port}/{postgre_database}"
+properties = {
+    "user": postgre_username,
+    "password": postgre_password,
+    "driver": "org.postgresql.Driver"
+}
+
+# Define the SQL query to fetch data from the PostgreSQL database
+query = "SELECT * FROM your_table_name"
+
+# Read data from the PostgreSQL database into a DynamicFrame
+datasource = glueContext.create_dynamic_frame.from_options(
+    connection_type="jdbc",
+    connection_options={
+        "url": jdbc_url,
+        "dbtable": f"({query}) AS subquery",
+    },
+    format="jdbc",
+    transformation_ctx="datasource",
+    push_down_predicate=query
+)
+
+# Print the schema and show the data
+datasource.printSchema()
+datasource.show()
+
+# Commit the job
+job.commit()
